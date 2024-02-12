@@ -1,14 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:lab3/auth.dart';
+import 'package:lab3/calendar.dart';
 import 'package:lab3/exam_screen.dart';
 import 'exam.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:lab3/notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await AwesomeNotifications().initialize(null, [
+    NotificationChannel(
+      channelGroupKey: "basic_channel_group",
+      channelKey: "basic_channel",
+      channelName: "basic_notif",
+      channelDescription: "basic notification channel",
+    )
+  ], channelGroups: [
+    NotificationChannelGroup(
+        channelGroupKey: "basic_channel_group", channelGroupName: "basic_group")
+  ]);
+
+  bool isAllowedToSendNotification =
+      await AwesomeNotifications().isNotificationAllowed();
+
+  if (!isAllowedToSendNotification) {
+    AwesomeNotifications().requestPermissionToSendNotifications();
+  }
+
   runApp(const MyApp());
 }
 
@@ -21,7 +43,8 @@ class MyApp extends StatelessWidget {
       title: 'Lab3',
       theme: ThemeData().copyWith(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 187, 238)),
+        colorScheme:
+            ColorScheme.fromSeed(seedColor: Color.fromARGB(255, 255, 187, 238)),
       ),
       initialRoute: '/',
       routes: {
@@ -55,6 +78,49 @@ class MainListScreenState extends State<MainListScreen> {
         course: 'Менаџмент на Информациски Системи',
         timestamp: DateTime(2024, 02, 21, 15, 00)),
   ];
+  void _openCalendar() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Calendar(exams: exams),
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    AwesomeNotifications().setListeners(
+        onActionReceivedMethod: Notifications.onActionReceiveMethod,
+        onDismissActionReceivedMethod:
+            Notifications.onDismissActionReceiveMethod,
+        onNotificationCreatedMethod: Notifications.onNotificationCreateMethod,
+        onNotificationDisplayedMethod: Notifications.onNotificationDisplayed);
+    _scheduleNotificationsForExistingExams();
+  }
+
+  void _scheduleNotification(Exam exam) {
+    final int notificationId = exams.indexOf(exam);
+
+    AwesomeNotifications().createNotification(
+        content: NotificationContent(
+            id: notificationId,
+            channelKey: "basic_channel",
+            title: exam.course,
+            body: "You have an exam tomorrow!"),
+        schedule: NotificationCalendar(
+            day: exam.timestamp.subtract(const Duration(days: 1)).day,
+            month: exam.timestamp.subtract(const Duration(days: 1)).month,
+            year: exam.timestamp.subtract(const Duration(days: 1)).year,
+            hour: exam.timestamp.subtract(const Duration(days: 1)).hour,
+            minute: exam.timestamp.subtract(const Duration(days: 1)).minute));
+  }
+
+  void _scheduleNotificationsForExistingExams() {
+    for (int i = 0; i < exams.length; i++) {
+      _scheduleNotification(exams[i]);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +133,10 @@ class MainListScreenState extends State<MainListScreen> {
             onPressed: () => FirebaseAuth.instance.currentUser != null
                 ? _addExamFunction(context)
                 : _navigateToSignInPage(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: _openCalendar,
           ),
           IconButton(
             icon: const Icon(Icons.login),
@@ -136,6 +206,7 @@ class MainListScreenState extends State<MainListScreen> {
   void _addExam(Exam exam) {
     setState(() {
       exams.add(exam);
+      _scheduleNotification(exam);
     });
   }
 }
