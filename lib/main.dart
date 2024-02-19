@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:lab3/auth.dart';
 import 'package:lab3/calendar.dart';
 import 'package:lab3/exam_screen.dart';
+import 'package:lab3/map.dart';
 import 'exam.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -78,6 +79,40 @@ class MainListScreenState extends State<MainListScreen> {
         course: 'Менаџмент на Информациски Системи',
         timestamp: DateTime(2024, 02, 21, 15, 00)),
   ];
+
+  void _openMap() {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (context) => const MapWidget()));
+  }
+
+  void _toggleLocationNotifications() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Location Based Notifications"),
+          content: _isLocationBasedNotificationsEnabled
+              ? const Text("You have turned off location-based notifications")
+              : const Text("You have turned on location-based notifications"),
+          actions: [
+            TextButton(
+              onPressed: () {
+                NotificationService().toggleLocationNotification();
+                setState(() {
+                  _isLocationBasedNotificationsEnabled =
+                      !_isLocationBasedNotificationsEnabled;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text("OK"),
+            )
+          ],
+        );
+      },
+    );
+  }
+
   void _openCalendar() {
     Navigator.push(
       context,
@@ -87,6 +122,7 @@ class MainListScreenState extends State<MainListScreen> {
     );
   }
 
+  bool _isLocationBasedNotificationsEnabled = false;
   @override
   void initState() {
     super.initState();
@@ -129,11 +165,19 @@ class MainListScreenState extends State<MainListScreen> {
         title: const Text('Exams'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.alarm_add),
+            color: _isLocationBasedNotificationsEnabled
+                ? const Color.fromARGB(255, 255, 64, 64)
+                : Colors.grey,
+            onPressed: _toggleLocationNotifications,
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => FirebaseAuth.instance.currentUser != null
                 ? _addExamFunction(context)
                 : _navigateToSignInPage(context),
           ),
+          IconButton(onPressed: _openMap, icon: const Icon(Icons.map)),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: _openCalendar,
